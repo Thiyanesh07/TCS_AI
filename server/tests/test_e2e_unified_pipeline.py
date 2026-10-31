@@ -87,3 +87,4 @@ def test_unified_end_to_end_flow(client: TestClient, db_session: Session):
         headers=auth_headers,
     )
     assert findings_res.status_code == 200
+

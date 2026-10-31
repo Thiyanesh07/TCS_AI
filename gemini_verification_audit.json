@@ -1,0 +1,31 @@
+{
+  "provider": "Google Gemini",
+  "model": "gemini-3-flash-preview",
+  "package": "langchain_google_genai v4.4.2",
+  "authentication_verified": true,
+  "credential_secret_redacted": true,
+  "structured_output_verified": true,
+  "timeout_error_handling_verified": true,
+  "latencies": {
+    "auth_ping_ms": 9323.878299997887,
+    "structured_output_ms": 2244.414999993751,
+    "grounding_eval_ms": 1.7048000008799136,
+    "failure_diagnosis_ms": 6045.44810000516
+  },
+  "operations_powered_by_gemini": [
+    "Semantic Answer Evaluation",
+    "Claim Extraction & Grounding Reasoning",
+    "Evidence Comparison",
+    "Failure Root-Cause Diagnosis",
+    "Remediation Recommendation Synthesis",
+    "Regression Test Generation"
+  ],
+  "operations_kept_in_deterministic_python": [
+    "Archive ZipSlip & Binary Inspection",
+    "Container Quota Enforcement (CPU/RAM/PIDs)",
+    "Numerical Threshold Match (80% attendance, 8.5 CGPA)",
+    "Citation Format & Chunk Existence Checks",
+    "SHA-256 Forensic Evidence Hashing",
+    "Secret Redaction Patterns"
+  ]
+}

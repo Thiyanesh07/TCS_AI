@@ -235,3 +235,4 @@ A comprehensive end-to-end integration test was executed against the running Doc
 - [x] Target Docker sandbox isolated without host credentials or evaluator secrets.
 - [x] 100% of unit and integration test suites passing.
 - [x] Production build generated cleanly in `frontend/dist`.
+
