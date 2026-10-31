@@ -1,11 +1,9 @@
 /**
  * QualiTrust AI — AI Evaluation Execution Service
  *
- * Status: PENDING_BACKEND_CONFIRMATION
  * Centralized service for triggering, polling, and retrieving evaluation runs.
  * Integrates with the centralized Axios client singleton.
- *
- * Audit Fix: Zero fake successful executions; explicit DEVELOPMENT_MOCK_ONLY labeling.
+ * Live integration with FastAPI backend evaluation engine.
  */
 
 import { apiClient } from "@/services/api.client";
@@ -20,22 +18,25 @@ export const evaluationService = {
    * Configure & Trigger a New Evaluation Run
    *
    * Transmits evaluation configuration to backend engine.
-   * Strict Rule: Never simulate fake successful execution or fake progress when backend is unavailable.
    */
   async startEvaluation(
     payload: StartEvaluationPayload
   ): Promise<{ runId: string; message: string }> {
     try {
-      const response = await apiClient.post<{ runId: string; message: string }>(
-        "/evaluations/start",
-        payload
-      );
-      return response.data;
-    } catch {
-      // Do NOT simulate fake successful execution if backend is offline.
-      throw new Error(
-        "Backend Evaluation Engine Offline: Evaluation trigger endpoint is unavailable (Contract Status: PENDING_BACKEND_CONFIRMATION). The evaluation configuration was validated locally, but execution requires an active sandbox engine."
-      );
+      const response = await apiClient.post<any>("/evaluations/start", payload);
+      const raw = response.data?.data || response.data;
+      const runId = raw.runId || raw.id || response.data?.runId;
+      return {
+        runId: String(runId),
+        message: raw.message || "Evaluation started successfully.",
+      };
+    } catch (err: any) {
+      const detail =
+        err.response?.data?.detail ||
+        err.response?.data?.error?.message ||
+        err.message ||
+        "Failed to trigger evaluation run on backend.";
+      throw new Error(detail);
     }
   },
 
@@ -44,17 +45,20 @@ export const evaluationService = {
    */
   async getEvaluationProgress(runId: string): Promise<EvaluationRunDetail> {
     try {
-      const response = await apiClient.get<EvaluationRunDetail>(`/evaluations/${runId}/progress`);
-      return { ...response.data, dataSource: "LIVE_BACKEND" };
-    } catch {
-      // If inspecting the seed development fixture, return it clearly marked
+      const response = await apiClient.get<any>(`/evaluations/${runId}/progress`);
+      const raw = response.data?.data || response.data;
+      return { ...raw, dataSource: "LIVE_BACKEND" };
+    } catch (err: any) {
       if (runId === "run_9841") {
         return { ...MOCK_EVALUATION_RUN_DETAIL, dataSource: "DEVELOPMENT_MOCK_ONLY" };
       }
 
-      throw new Error(
-        `Evaluation run "${runId}" not found on backend (Status: PENDING_BACKEND_CONFIRMATION).`
-      );
+      const detail =
+        err.response?.data?.detail ||
+        err.response?.data?.error?.message ||
+        err.message ||
+        `Evaluation run "${runId}" not found on backend.`;
+      throw new Error(detail);
     }
   },
 
@@ -63,17 +67,20 @@ export const evaluationService = {
    */
   async getEvaluationResults(runId: string): Promise<EvaluationRunDetail> {
     try {
-      const response = await apiClient.get<EvaluationRunDetail>(`/evaluations/${runId}/results`);
-      return { ...response.data, dataSource: "LIVE_BACKEND" };
-    } catch {
-      // If inspecting the seed development fixture, return it clearly marked
+      const response = await apiClient.get<any>(`/evaluations/${runId}/progress`);
+      const raw = response.data?.data || response.data;
+      return { ...raw, dataSource: "LIVE_BACKEND" };
+    } catch (err: any) {
       if (runId === "run_9841") {
         return { ...MOCK_EVALUATION_RUN_DETAIL, dataSource: "DEVELOPMENT_MOCK_ONLY" };
       }
 
-      throw new Error(
-        `Evaluation results for run "${runId}" are unavailable on backend (Status: PENDING_BACKEND_CONFIRMATION).`
-      );
+      const detail =
+        err.response?.data?.detail ||
+        err.response?.data?.error?.message ||
+        err.message ||
+        `Evaluation results for run "${runId}" are unavailable on backend.`;
+      throw new Error(detail);
     }
   },
 
@@ -82,10 +89,13 @@ export const evaluationService = {
    */
   async getEvaluationHistory(): Promise<EvaluationRunDetail[]> {
     try {
-      const response = await apiClient.get<EvaluationRunDetail[]>("/evaluations/history");
-      return response.data.map((run) => ({ ...run, dataSource: "LIVE_BACKEND" }));
+      const response = await apiClient.get<any>("/evaluations/history");
+      const raw = response.data?.data || response.data;
+      if (Array.isArray(raw)) {
+        return raw.map((run: any) => ({ ...run, dataSource: "LIVE_BACKEND" }));
+      }
+      return [{ ...MOCK_EVALUATION_RUN_DETAIL, dataSource: "DEVELOPMENT_MOCK_ONLY" }];
     } catch {
-      // Return development mock fixtures clearly marked
       return [{ ...MOCK_EVALUATION_RUN_DETAIL, dataSource: "DEVELOPMENT_MOCK_ONLY" }];
     }
   },
