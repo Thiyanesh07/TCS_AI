@@ -1,0 +1,51 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    /* Executive Light Theme Tokens */
+    --background: #f8fafc;
+    --foreground: #0f172a;
+
+    --card: #ffffff;
+    --card-foreground: #0f172a;
+
+    --popover: #ffffff;
+    --popover-foreground: #0f172a;
+
+    --muted: #f1f5f9;
+    --muted-foreground: #64748b;
+
+    --border: #e2e8f0;
+    --input: #e2e8f0;
+    --ring: #6366f1;
+
+    /* Brand & Action Accents */
+    --primary: #4f46e5;
+    --primary-foreground: #ffffff;
+
+    --secondary: #f8fafc;
+    --secondary-foreground: #1e293b;
+
+    --accent: #eef2ff;
+    --accent-foreground: #4338ca;
+
+    /* Evaluation Health & Telemetry Tokens */
+    --success: #10b981;
+    --success-foreground: #ffffff;
+
+    --warning: #f59e0b;
+    --warning-foreground: #ffffff;
+
+    --destructive: #ef4444;
+    --destructive-foreground: #ffffff;
+
+    --radius: 0.5rem;
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
