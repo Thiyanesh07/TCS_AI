@@ -12,8 +12,23 @@ class ApplicationApiCreateRequest(BaseModel):
     """External API target registration schema."""
     name: str = Field(min_length=1, max_length=255, description="Application display name")
     description: Optional[str] = Field(default=None, description="Optional application description")
-    target_url: str = Field(description="HTTPS URL endpoint of the target AI application")
-    version_label: str = Field(default="v1.0.0", min_length=1, max_length=100, description="Version label")
+    target_url: Optional[str] = Field(default=None, description="HTTPS URL endpoint of the target AI application")
+    baseUrl: Optional[str] = Field(default=None, description="Base URL of target API")
+    endpointPath: Optional[str] = Field(default=None, description="Endpoint path")
+    version_label: Optional[str] = Field(default=None, min_length=1, max_length=100, description="Version label")
+    version: Optional[str] = Field(default=None, description="Alternative version label")
+
+    def get_target_url(self) -> str:
+        if self.target_url:
+            return self.target_url
+        if self.baseUrl:
+            path = (self.endpointPath or "").lstrip("/")
+            base = self.baseUrl.rstrip("/")
+            return f"{base}/{path}" if path else base
+        raise ValueError("Either target_url or baseUrl must be provided.")
+
+    def get_version_label(self) -> str:
+        return self.version_label or self.version or "v1.0.0" 
 
 
 class ApplicationResponseData(BaseModel):

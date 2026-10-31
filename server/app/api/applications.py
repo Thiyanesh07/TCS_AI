@@ -53,11 +53,19 @@ router = APIRouter(prefix="/applications", tags=["Applications"])
     summary="Register Application via ZIP Upload",
     description="Uploads and inspects an application ZIP bundle, registering the application and initial version.",
 )
+@router.post(
+    "/upload-zip",
+    status_code=status.HTTP_201_CREATED,
+    summary="Register Application via ZIP Upload (Alias)",
+    description="Uploads and inspects an application ZIP bundle, registering the application and initial version.",
+)
 async def register_application_zip(
     name: str = Form(..., min_length=1, max_length=255),
     description: Optional[str] = Form(None),
-    version_label: str = Form("v1.0.0", min_length=1, max_length=100),
-    file: UploadFile = File(...),
+    version_label: Optional[str] = Form(None),
+    version: Optional[str] = Form(None),
+    file: Optional[UploadFile] = File(None),
+    package: Optional[UploadFile] = File(None),
     current_user: User = Depends(require_org_user),
     db: Session = Depends(get_db),
 ):
@@ -67,22 +75,31 @@ async def register_application_zip(
             detail="Organisation association is required to register applications.",
         )
 
+    upload_file = file or package
+    if not upload_file:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="A valid .zip file must be uploaded under the 'file' or 'package' parameter.",
+        )
+
+    active_version_label = version_label or version or "v1.0.0"
+
     # Read uploaded bytes with size enforcement
-    content = await file.read()
+    content = await upload_file.read()
     if len(content) > settings.MAX_UPLOAD_SIZE_BYTES:
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             detail=f"Uploaded file exceeds maximum size limit of {settings.MAX_UPLOAD_SIZE_BYTES // (1024 * 1024)}MB.",
         )
 
-    app, version = register_zip_application(
+    app, app_ver = register_zip_application(
         db=db,
         organisation_id=current_user.organisation_id,
         name=name,
         description=description,
-        version_label=version_label,
+        version_label=active_version_label,
         zip_bytes=content,
-        filename=file.filename,
+        filename=upload_file.filename,
     )
 
     return {
@@ -106,6 +123,12 @@ async def register_application_zip(
     summary="Register Application via API Target",
     description="Registers an AI application targeting an external HTTPS API endpoint.",
 )
+@router.post(
+    "/connect-api",
+    status_code=status.HTTP_201_CREATED,
+    summary="Register Application via API Target (Alias)",
+    description="Registers an AI application targeting an external HTTPS API endpoint.",
+)
 def register_application_api(
     payload: ApplicationApiCreateRequest,
     current_user: User = Depends(require_org_user),
@@ -117,13 +140,16 @@ def register_application_api(
             detail="Organisation association is required to register applications.",
         )
 
+    target_url = payload.get_target_url()
+    version_label = payload.get_version_label()
+
     app, version = register_api_application(
         db=db,
         organisation_id=current_user.organisation_id,
         name=payload.name,
         description=payload.description,
-        target_url=payload.target_url,
-        version_label=payload.version_label,
+        target_url=target_url,
+        version_label=version_label,
     )
 
     return {
