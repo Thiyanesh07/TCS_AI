@@ -1,6 +1,8 @@
 import { apiClient } from "@/services/api.client";
 import { DetailedFinding, QualityReportSummary } from "@/types/findings.types";
 import { MOCK_DETAILED_FINDINGS, MOCK_QUALITY_REPORT } from "@/mocks/findings.mock";
+import { isDemoMode } from "@/utils/env";
+import { demoFindingsService } from "@/demo";
 
 export const findingsService = {
   /**
@@ -12,6 +14,10 @@ export const findingsService = {
     pillar?: string;
     status?: string;
   }): Promise<DetailedFinding[]> {
+    if (isDemoMode()) {
+      return demoFindingsService.getFindings(params);
+    }
+
     try {
       const response = await apiClient.get<DetailedFinding[]>("/findings", { params });
       return response.data.map((f) => ({ ...f, dataSource: "LIVE_BACKEND" }));
@@ -49,6 +55,10 @@ export const findingsService = {
    * Retrieve specific finding by unique ID.
    */
   async getFindingById(id: string): Promise<DetailedFinding | null> {
+    if (isDemoMode()) {
+      return demoFindingsService.getFindingById(id);
+    }
+
     try {
       const response = await apiClient.get<DetailedFinding>(`/findings/${id}`);
       return { ...response.data, dataSource: "LIVE_BACKEND" };
@@ -62,6 +72,10 @@ export const findingsService = {
    * Retrieve structured quality report summary for an evaluation run.
    */
   async getQualityReport(runId: string): Promise<QualityReportSummary> {
+    if (isDemoMode()) {
+      return demoFindingsService.getQualityReport(runId);
+    }
+
     try {
       const response = await apiClient.get<QualityReportSummary>(`/reports/${runId}`);
       return { ...response.data, dataSource: "LIVE_BACKEND" };
@@ -74,6 +88,10 @@ export const findingsService = {
    * Export evaluation quality report to client-side CSV or Browser Print / PDF.
    */
   exportReport(report: QualityReportSummary, format: "CSV" | "PRINT") {
+    if (isDemoMode()) {
+      return demoFindingsService.exportReport(report, format);
+    }
+
     if (format === "PRINT") {
       window.print();
       return;

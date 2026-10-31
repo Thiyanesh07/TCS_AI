@@ -181,3 +181,16 @@ flowchart TD
 - [x] TypeScript compilation: 0 errors (`npx tsc --noEmit`).
 - [x] Vite production build: 100% success with 0 chunk warnings (407 kB main bundle).
 - [x] All 14 routes return HTTP 200 OK on local dev server.
+
+---
+
+## Extension Milestone: Judge Demonstration Mode (Completed)
+- [x] Implement offline demonstration engine in `src/demo/` with zero backend server or pod dependencies.
+- [x] Persistent visible disclaimer banner across all dashboard views.
+- [x] 1-Click login shortcuts on `/login` for `ORG_USER` and `PLATFORM_ADMIN`.
+- [x] 3 Predefined deterministic scenarios (`HEALTHY_APPLICATION`, `APPLICATION_WITH_RISKS`, `CRITICAL_SECURITY_FAILURE`).
+- [x] Deterministic 8-stage time-based pipeline simulation with pod logs and restart capability.
+- [x] Instant local persistence via reactive store and `localStorage`.
+- [x] Downloadable quality benchmark CSV export and browser print/PDF format.
+- [x] Interactive release review human sign-off form updating local store state.
+- [x] Continuous regression drift metric tables.

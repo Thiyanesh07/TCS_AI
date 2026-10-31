@@ -15,6 +15,8 @@ import {
   RegistrationResponse,
 } from "@/types/application.types";
 import { MOCK_APPLICATIONS } from "@/mocks/application.mock";
+import { isDemoMode } from "@/utils/env";
+import { demoApplicationService } from "@/demo";
 
 export const applicationService = {
   /**
@@ -28,6 +30,10 @@ export const applicationService = {
     payload: ZipUploadPayload,
     onProgress?: (percent: number) => void
   ): Promise<RegistrationResponse> {
+    if (isDemoMode()) {
+      return demoApplicationService.registerZipApplication(payload, onProgress);
+    }
+
     const formData = new FormData();
     formData.append("name", payload.name);
     if (payload.description) formData.append("description", payload.description);
@@ -96,6 +102,10 @@ export const applicationService = {
   async registerApiApplication(
     payload: ApiRegistrationPayload
   ): Promise<RegistrationResponse> {
+    if (isDemoMode()) {
+      return demoApplicationService.registerApiApplication(payload);
+    }
+
     try {
       const targetUrl = `${payload.baseUrl.replace(/\/+$/, "")}/${payload.endpointPath.replace(/^\/+/, "")}`;
       const response = await apiClient.post<any>("/applications/connect-api", {
@@ -161,6 +171,10 @@ export const applicationService = {
    * Returns live data when backend responds; falls back to explicit DEVELOPMENT_MOCK_ONLY fixtures.
    */
   async getApplications(params?: ApplicationFilterParams): Promise<RegisteredApplication[]> {
+    if (isDemoMode()) {
+      return demoApplicationService.getApplications(params);
+    }
+
     try {
       const response = await apiClient.get<any>("/applications", { params });
       const rawList = Array.isArray(response.data)
@@ -220,6 +234,10 @@ export const applicationService = {
    * Retrieve specific registered application by unique ID.
    */
   async getApplicationById(id: string): Promise<RegisteredApplication | null> {
+    if (isDemoMode()) {
+      return demoApplicationService.getApplicationById(id);
+    }
+
     try {
       const response = await apiClient.get<any>(`/applications/${id}`);
       const raw = response.data?.data || response.data?.application || response.data;

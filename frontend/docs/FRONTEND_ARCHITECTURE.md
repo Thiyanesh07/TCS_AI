@@ -186,3 +186,27 @@ The platform supports **exactly two roles**:
   - Findings ledger with expandable prompt/response evidence accordions.
 - **`EvaluationHistoryPage`** (`src/pages/evaluations/EvaluationHistoryPage.tsx`):
   - Global evaluation audit log across all connected workloads.
+
+---
+
+## 12. Judge Demonstration Mode Architecture (`src/demo/*`)
+
+To ensure hackathon evaluators and judges can experience the complete product journey without requiring backend servers, PostgreSQL databases, or Kubernetes worker pods, a dedicated **Demonstration Mode** is implemented:
+
+- **Activation Governance**:
+  - `isDemoMode()` checks `VITE_DEMO_MODE === "true"`, query parameter `?demo=true`, or `localStorage.getItem("qualitrust_demo_mode") === "true"`.
+  - Zero disruption to production: real Axios calls and error boundaries remain intact when demo mode is off (`VITE_DEMO_MODE=false`).
+- **Demo Store (`src/demo/demo.store.ts`)**:
+  - Reactive in-memory store synchronized with `localStorage`.
+  - Maintains pre-seeded applications, runs, findings, release reviews, and regression benchmarks across browser refreshes.
+- **Demo Services (`src/demo/demo.*.service.ts`)**:
+  - `demoAuthService`: 1-click access for `ORG_USER` and `PLATFORM_ADMIN`.
+  - `demoApplicationService`: Local ZIP upload and REST API registration simulations.
+  - `demoEvaluationService`: Deterministic time-based pipeline simulation advancing through all 8 stages (~2s per stage) with synthetic console logs and restart capability.
+  - `demoFindingsService`: Findings queries, Deep Evidence Explorer retrieval, and downloadable CSV generation.
+  - `demoReleaseService`: Release sign-off state transitions.
+  - `demoRegressionService`: Golden baseline drift calculations (+34%, -45%).
+- **Visual Disclosure & Scenario Switcher (`src/components/demo/DemoBanner.tsx`)**:
+  - Persistent amber disclaimer: `"DEMO MODE — Demonstration data. No live AI evaluation is being executed."`
+  - Dropdown to immediately toggle between `HEALTHY_APPLICATION`, `APPLICATION_WITH_RISKS`, and `CRITICAL_SECURITY_FAILURE`.
+  - Reset button to restore pristine baseline fixtures at any time.

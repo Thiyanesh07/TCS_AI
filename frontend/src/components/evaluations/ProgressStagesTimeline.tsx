@@ -10,9 +10,12 @@ import {
   ArrowRight,
   ShieldCheck,
   AlertCircle,
+  RotateCcw,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/utils/cn";
+import { isDemoMode } from "@/utils/env";
+import { useRestartEvaluation } from "@/hooks/useEvaluations";
 
 interface ProgressStagesTimelineProps {
   run: EvaluationRunDetail;
@@ -22,20 +25,32 @@ export function ProgressStagesTimeline({ run }: ProgressStagesTimelineProps) {
   const navigate = useNavigate();
   const isCompleted = run.status === "COMPLETED";
   const isFailed = run.status === "FAILED";
+  const demoActive = isDemoMode();
+  const restartMutation = useRestartEvaluation();
 
   const completedStagesCount = run.stages.filter((s) => s.status === "completed").length;
   const progressPercent = Math.round((completedStagesCount / run.stages.length) * 100);
 
   return (
     <div className="space-y-6">
-      {run.dataSource === "DEVELOPMENT_MOCK_ONLY" && (
+      {demoActive ? (
+        <div className="bg-indigo-50 border border-indigo-200 px-4 py-2.5 rounded-xl text-xs text-indigo-900 font-semibold flex items-center justify-between">
+          <span className="flex items-center gap-2">
+            <span className="flex h-2 w-2 rounded-full bg-indigo-600 animate-ping" />
+            <span>DEMO EVALUATION SANDBOX — Deterministic 8-stage time-based pipeline simulation.</span>
+          </span>
+          <span className="font-mono text-[10px] bg-indigo-100 px-2.5 py-0.5 rounded text-indigo-900 font-bold">
+            Judge Simulation Mode
+          </span>
+        </div>
+      ) : run.dataSource === "DEVELOPMENT_MOCK_ONLY" ? (
         <div className="bg-amber-50 border border-amber-200 px-4 py-2 rounded-xl text-xs text-amber-800 font-semibold flex items-center justify-between">
           <span>⚠️ DEVELOPMENT_MOCK_ONLY: Displaying offline development pipeline fixture.</span>
           <span className="font-mono text-[10px] bg-amber-100 px-2 py-0.5 rounded text-amber-900">
             Contract: PENDING_BACKEND_CONFIRMATION
           </span>
         </div>
-      )}
+      ) : null}
       {/* Run Metadata Header */}
       <Card className="border border-slate-200 bg-white p-5 shadow-xs">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -72,6 +87,21 @@ export function ProgressStagesTimeline({ run }: ProgressStagesTimelineProps) {
                 <span>{run.elapsedSeconds}s</span>
               </span>
             </div>
+
+            {demoActive && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => restartMutation.mutate(run.id)}
+                disabled={restartMutation.isPending}
+                className="rounded-xl h-10 px-3 text-xs font-bold gap-1.5"
+                title="Restart simulation from Stage 1 for judge demonstration"
+              >
+                <RotateCcw className="h-3.5 w-3.5 text-slate-500" />
+                <span>Restart Simulation</span>
+              </Button>
+            )}
 
             {isCompleted && (
               <Button

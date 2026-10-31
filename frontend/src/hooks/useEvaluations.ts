@@ -52,3 +52,14 @@ export function useStartEvaluation() {
   });
 }
 
+export function useRestartEvaluation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (runId: string) => evaluationService.restartEvaluation(runId),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: EVALUATION_KEYS.progress(data.id) });
+      queryClient.invalidateQueries({ queryKey: EVALUATION_KEYS.results(data.id) });
+    },
+  });
+}
+

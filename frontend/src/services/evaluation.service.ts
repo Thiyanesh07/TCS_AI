@@ -3,7 +3,7 @@
  *
  * Centralized service for triggering, polling, and retrieving evaluation runs.
  * Integrates with the centralized Axios client singleton.
- * Live integration with FastAPI backend evaluation engine.
+ * Live integration with FastAPI backend evaluation engine + Demo Mode fallback.
  */
 
 import { apiClient } from "@/services/api.client";
@@ -12,6 +12,8 @@ import {
   EvaluationRunDetail,
 } from "@/types/evaluation.types";
 import { MOCK_EVALUATION_RUN_DETAIL } from "@/mocks/evaluation.mock";
+import { isDemoMode } from "@/utils/env";
+import { demoEvaluationService } from "@/demo";
 
 export const evaluationService = {
   /**
@@ -22,6 +24,10 @@ export const evaluationService = {
   async startEvaluation(
     payload: StartEvaluationPayload
   ): Promise<{ runId: string; message: string }> {
+    if (isDemoMode()) {
+      return demoEvaluationService.startEvaluation(payload);
+    }
+
     try {
       const response = await apiClient.post<any>("/evaluations/start", payload);
       const raw = response.data?.data || response.data;
@@ -44,12 +50,16 @@ export const evaluationService = {
    * Poll Current Progress of an Active Evaluation Run
    */
   async getEvaluationProgress(runId: string): Promise<EvaluationRunDetail> {
+    if (isDemoMode()) {
+      return demoEvaluationService.getEvaluationProgress(runId);
+    }
+
     try {
       const response = await apiClient.get<any>(`/evaluations/${runId}/progress`);
       const raw = response.data?.data || response.data;
       return { ...raw, dataSource: "LIVE_BACKEND" };
     } catch (err: any) {
-      if (runId === "run_9841") {
+      if (runId === "run_9841" || runId.startsWith("demo_")) {
         return { ...MOCK_EVALUATION_RUN_DETAIL, dataSource: "DEVELOPMENT_MOCK_ONLY" };
       }
 
@@ -66,12 +76,16 @@ export const evaluationService = {
    * Retrieve Final Results and Metrics for a Completed Run
    */
   async getEvaluationResults(runId: string): Promise<EvaluationRunDetail> {
+    if (isDemoMode()) {
+      return demoEvaluationService.getEvaluationResults(runId);
+    }
+
     try {
       const response = await apiClient.get<any>(`/evaluations/${runId}/progress`);
       const raw = response.data?.data || response.data;
       return { ...raw, dataSource: "LIVE_BACKEND" };
     } catch (err: any) {
-      if (runId === "run_9841") {
+      if (runId === "run_9841" || runId.startsWith("demo_")) {
         return { ...MOCK_EVALUATION_RUN_DETAIL, dataSource: "DEVELOPMENT_MOCK_ONLY" };
       }
 
@@ -88,6 +102,10 @@ export const evaluationService = {
    * Retrieve Catalog of Evaluation History
    */
   async getEvaluationHistory(): Promise<EvaluationRunDetail[]> {
+    if (isDemoMode()) {
+      return demoEvaluationService.getEvaluationHistory();
+    }
+
     try {
       const response = await apiClient.get<any>("/evaluations/history");
       const raw = response.data?.data || response.data;
@@ -98,6 +116,16 @@ export const evaluationService = {
     } catch {
       return [{ ...MOCK_EVALUATION_RUN_DETAIL, dataSource: "DEVELOPMENT_MOCK_ONLY" }];
     }
+  },
+
+  /**
+   * Demo-only restart/retry action for judges
+   */
+  async restartEvaluation(runId: string): Promise<EvaluationRunDetail> {
+    if (isDemoMode()) {
+      return demoEvaluationService.restartEvaluation(runId);
+    }
+    throw new Error("Restart only supported in demo mode.");
   },
 };
 

@@ -113,7 +113,47 @@ npm run build
 
 ---
 
+## Complete Judge Demonstration Mode (Offline / Hackathon Demo)
+
+QualiTrust AI includes a dedicated, fully interactive **JUDGE DEMONSTRATION MODE** that runs 100% locally in the browser with **zero backend server, database, or sandbox pods required**.
+
+### Quick Start for Judges & Evaluators
+1. Start the frontend:
+   ```bash
+   cd d:\Hackathon-Arsenal\QualiTrustAI\frontend
+   npm run dev
+   ```
+2. Open your browser at:
+   ```
+   http://localhost:5173
+   ```
+3. Click either 1-click login button on the login screen:
+   - **"Demo Org User (1-Click)"** (`sarah.chen@nexusaipharma.com`)
+   - **"Demo Platform Admin (1-Click)"** (`alex.vance@qualitrust.ai`)
+
+### Key Demo Features & End-to-End Walkthrough
+- **Persistent Demo Indicator**: A prominent banner identifies demonstration mode (`DEMO MODE — Demonstration data. No live AI evaluation is being executed.`).
+- **Interactive Scenario Switcher**: Toggle dynamically between 3 distinct scenarios:
+  1. `HEALTHY_APPLICATION`: Score 95/100, RELEASE APPROVED, 0 blockers.
+  2. `APPLICATION_WITH_RISKS`: Score 76/100, CONDITIONAL_RELEASE, 2 warnings.
+  3. `CRITICAL_SECURITY_FAILURE`: Score 49/100, REJECTED, 2 critical blockers (Prompt Injection & Hazmat compliance).
+- **Application Onboarding**:
+  - Test **ZIP upload**: Drag and drop any `.zip` file with file validation, preview, and simulated upload progress.
+  - Test **REST API connection**: Enter endpoint and auth config. Both save locally in browser storage!
+- **Application Details Workspace**: Browse all 8 workspace tabs for any pre-seeded workload.
+- **Interactive Evaluation Sandbox**:
+  - Go to `/evaluations/new` and click **"Launch Evaluation Sandbox"** without offline errors.
+  - Watch the live **8-stage evaluation pipeline** advance step-by-step with real-time sandbox pod logs.
+  - Test the **"Restart Simulation"** action to run it again.
+- **Release Gate Intelligence**: Inspect the 9-pillar scorecard, test counters, and release recommendation.
+- **Deep Evidence Explorer**: Inspect prompt, model output, and expected ground truth discrepancies at `/findings`.
+- **Quality Reports**: Export the benchmark report to a **downloadable CSV file** or print to PDF at `/reports/:runId`.
+- **Release Sign-Off & Regressions**: Conduct human governance sign-offs at `/release-reviews` and observe benchmark drift at `/regression`.
+
+---
+
 ## Governance & Security Policies
 - **Role Governance**: The application recognizes exactly two roles: `PLATFORM_ADMIN` and `ORG_USER`.
 - **Zero Frontend Tenant Trust**: Tenant isolation is strictly enforced server-side. The frontend does not construct or trust organization IDs for data scoping.
 - **Contract Integrity**: All API integrations adhere strictly to confirmed backend contracts.
+- **Honest Demonstration**: Demonstration data is strictly identified as `DEVELOPMENT_MOCK_ONLY` and never presented as genuine live AI evaluations.

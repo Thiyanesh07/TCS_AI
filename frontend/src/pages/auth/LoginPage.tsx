@@ -1,21 +1,38 @@
 import * as React from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { AuthLayout } from "@/app/layouts/AuthLayout";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Button } from "@/components/ui/button";
-import { AlertCircle, Lock, ArrowRight } from "lucide-react";
+import { AlertCircle, Lock, ArrowRight, Sparkles, UserCheck, ShieldAlert } from "lucide-react";
+import { isDemoMode } from "@/utils/env";
 import { authService } from "@/services/auth.service";
+import { DEMO_CREDENTIALS } from "@/demo";
 
 export function LoginPage() {
   const navigate = useNavigate();
-  const [email, setEmail] = React.useState("");
-  const [password, setPassword] = React.useState("");
-  const [rememberMe, setRememberMe] = React.useState(false);
+  const demoActive = isDemoMode();
+
+  const [email, setEmail] = React.useState(
+    demoActive ? DEMO_CREDENTIALS.ORG_USER.email : "engineer@apex.ai"
+  );
+  const [password, setPassword] = React.useState(
+    demoActive ? DEMO_CREDENTIALS.ORG_USER.password : "SecurePassword123!"
+  );
+  const [rememberMe, setRememberMe] = React.useState(true);
   const [isLoading, setIsLoading] = React.useState(false);
   const [validationErrors, setValidationErrors] = React.useState<{ email?: string; password?: string }>({});
   const [loginError, setLoginError] = React.useState<string | null>(null);
+
+  const handleQuickDemoLogin = (role: "ORG_USER" | "PLATFORM_ADMIN") => {
+    setIsLoading(true);
+    setTimeout(() => {
+      authService.quickDemoLogin(role);
+      setIsLoading(false);
+      navigate("/dashboard");
+    }, 200);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,6 +60,15 @@ export function LoginPage() {
     setValidationErrors({});
     setIsLoading(true);
 
+    if (demoActive) {
+      setTimeout(() => {
+        authService.login(email, password);
+        setIsLoading(false);
+        navigate("/dashboard");
+      }, 350);
+      return;
+    }
+
     try {
       await authService.login({ email, password });
       await authService.getMe();
@@ -51,6 +77,7 @@ export function LoginPage() {
       setIsLoading(false);
       setLoginError(
         err.response?.data?.detail ||
+          err.response?.data?.error?.message ||
           err.message ||
           "Authentication failed. Please verify credentials."
       );
@@ -73,6 +100,49 @@ export function LoginPage() {
         </CardHeader>
 
         <CardContent className="space-y-4">
+          {/* Judge Demo Quick Access Banner */}
+          {demoActive && (
+            <div className="p-3 bg-gradient-to-r from-indigo-50 to-amber-50 border border-indigo-200/80 rounded-xl space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-indigo-900 flex items-center gap-1.5">
+                  <Sparkles className="h-3.5 w-3.5 text-amber-500" />
+                  <span>Judge Quick Demo Login (Zero Backend Required)</span>
+                </span>
+                <span className="text-[10px] uppercase font-bold bg-indigo-600 text-white px-2 py-0.5 rounded">
+                  Demo
+                </span>
+              </div>
+              <p className="text-[10.5px] text-slate-600 leading-relaxed">
+                Click below to instantly access the platform under either evaluation role:
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleQuickDemoLogin("ORG_USER")}
+                  disabled={isLoading}
+                  className="text-xs font-bold gap-1.5 bg-white border-indigo-200 hover:bg-indigo-50 text-indigo-700 h-8"
+                >
+                  <UserCheck className="h-3.5 w-3.5" />
+                  <span>Quality Engineer</span>
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleQuickDemoLogin("PLATFORM_ADMIN")}
+                  disabled={isLoading}
+                  className="text-xs font-bold gap-1.5 bg-white border-amber-300 hover:bg-amber-50 text-amber-800 h-8"
+                >
+                  <ShieldAlert className="h-3.5 w-3.5" />
+                  <span>Platform Superadmin</span>
+                </Button>
+              </div>
+            </div>
+          )}
+
           {/* Error Message */}
           {loginError && (
             <div
@@ -122,13 +192,13 @@ export function LoginPage() {
                 <label htmlFor="password" className="block text-xs font-semibold text-slate-700">
                   Password
                 </label>
-                <span className="text-[11px] text-indigo-600 hover:text-indigo-700 hover:underline cursor-pointer font-medium">
-                  Forgot password?
+                <span className="text-[11px] text-slate-400">
+                  {demoActive ? "Pre-filled for demo" : "Min 8 characters"}
                 </span>
               </div>
               <PasswordInput
                 id="password"
-                placeholder="••••••••"
+                placeholder="••••••••••••"
                 value={password}
                 onChange={(e) => {
                   setPassword(e.target.value);
@@ -146,41 +216,32 @@ export function LoginPage() {
               )}
             </div>
 
-            {/* Remember Me */}
-            <div className="flex items-center justify-between text-xs pt-1">
-              <label className="flex items-center gap-2 cursor-pointer select-none text-slate-600">
+            {/* Remember Me & Assistance */}
+            <div className="flex items-center justify-between pt-1">
+              <label className="flex items-center gap-2 cursor-pointer select-none">
                 <input
                   type="checkbox"
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
-                  className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500/20"
+                  disabled={isLoading}
+                  className="h-3.5 w-3.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                 />
-                <span>Remember this workstation</span>
+                <span className="text-xs text-slate-600">Remember session</span>
               </label>
+
+              <span className="text-xs font-semibold text-slate-500">Enterprise SSO</span>
             </div>
 
-            {/* Submit Action */}
+            {/* Submit Button */}
             <Button
               type="submit"
-              variant="primary"
-              size="md"
-              className="w-full justify-center"
               isLoading={isLoading}
+              className="w-full h-10 text-xs font-bold shadow-xs gap-2 mt-2"
             >
-              Sign In to Workspace
+              <span>{demoActive ? "Sign In (Demo Session)" : "Sign in to Platform"}</span>
+              <ArrowRight className="h-4 w-4" />
             </Button>
           </form>
-
-          {/* Quick Direct Link to Dashboard Shell */}
-          <div className="pt-2 text-center border-t border-slate-100">
-            <Link
-              to="/dashboard"
-              className="text-xs text-slate-500 hover:text-slate-900 font-medium inline-flex items-center gap-1"
-            >
-              <span>Explore Dashboard Shell directly</span>
-              <ArrowRight className="h-3 w-3 text-slate-400" />
-            </Link>
-          </div>
         </CardContent>
       </Card>
     </AuthLayout>
