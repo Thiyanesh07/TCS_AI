@@ -1,6 +1,8 @@
 import { apiClient } from "@/services/api.client";
 import { RegressionBenchmark } from "@/types/release.types";
 import { MOCK_REGRESSION_BENCHMARKS } from "@/mocks/release.mock";
+import { isDemoMode } from "@/utils/env";
+import { demoRegressionService } from "@/demo";
 
 export const regressionService = {
   /**
@@ -10,6 +12,10 @@ export const regressionService = {
     classification?: string;
     status?: string;
   }): Promise<RegressionBenchmark[]> {
+    if (isDemoMode()) {
+      return demoRegressionService.getRegressionBenchmarks(params);
+    }
+
     try {
       const response = await apiClient.get<RegressionBenchmark[]>("/regression/benchmarks", { params });
       return response.data.map((b) => ({ ...b, dataSource: "LIVE_BACKEND" }));

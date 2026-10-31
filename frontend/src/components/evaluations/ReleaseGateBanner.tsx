@@ -1,8 +1,9 @@
 import { ReleaseRecommendation } from "@/types/evaluation.types";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, AlertTriangle, XCircle, ShieldCheck } from "lucide-react";
+import { CheckCircle2, AlertTriangle, XCircle, ShieldCheck, Sparkles } from "lucide-react";
 import { cn } from "@/utils/cn";
+import { isDemoMode } from "@/utils/env";
 
 interface ReleaseGateBannerProps {
   decision?: ReleaseRecommendation;
@@ -29,6 +30,7 @@ export function ReleaseGateBanner({
 }: ReleaseGateBannerProps) {
   const isApproved = decision === "RELEASE";
   const isConditional = decision === "CONDITIONAL_RELEASE";
+  const demoActive = isDemoMode();
 
   return (
     <Card
@@ -41,7 +43,17 @@ export function ReleaseGateBanner({
           : "border-red-200 bg-red-50/30"
       )}
     >
-      {dataSource === "DEVELOPMENT_MOCK_ONLY" && (
+      {demoActive ? (
+        <div className="bg-gradient-to-r from-indigo-50 to-amber-50 border-b border-indigo-200 px-4 py-2 text-[11px] text-indigo-900 font-semibold flex items-center justify-between">
+          <span className="flex items-center gap-1.5">
+            <Sparkles className="h-3.5 w-3.5 text-amber-500" />
+            <span>Simulated evaluation results — not produced by a live AI evaluation engine.</span>
+          </span>
+          <span className="font-mono text-[10px] bg-indigo-100 text-indigo-800 px-2.5 py-0.5 rounded font-bold">
+            Judge Scenario Fixture
+          </span>
+        </div>
+      ) : dataSource === "DEVELOPMENT_MOCK_ONLY" ? (
         <div className="bg-amber-100 border-b border-amber-200 px-4 py-1.5 text-[11px] text-amber-800 font-semibold flex items-center justify-between">
           <span>
             ⚠️ DEVELOPMENT_MOCK_ONLY: This decision and quality score are non-authoritative development fixtures.
@@ -50,7 +62,7 @@ export function ReleaseGateBanner({
             Contract: PENDING_BACKEND_CONFIRMATION
           </span>
         </div>
-      )}
+      ) : null}
       <CardContent className="p-6">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
           {/* Decision Pill & Info */}

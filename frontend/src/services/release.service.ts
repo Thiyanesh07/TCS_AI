@@ -1,6 +1,8 @@
 import { apiClient } from "@/services/api.client";
 import { ReleaseReviewRecord, ReviewSubmissionPayload } from "@/types/release.types";
 import { MOCK_RELEASE_REVIEWS } from "@/mocks/release.mock";
+import { isDemoMode } from "@/utils/env";
+import { demoReleaseService } from "@/demo";
 
 export const releaseService = {
   /**
@@ -10,6 +12,10 @@ export const releaseService = {
     status?: string;
     decision?: string;
   }): Promise<ReleaseReviewRecord[]> {
+    if (isDemoMode()) {
+      return demoReleaseService.getReleaseReviews(params);
+    }
+
     try {
       const response = await apiClient.get<ReleaseReviewRecord[]>("/release-reviews", { params });
       return response.data.map((r) => ({ ...r, dataSource: "LIVE_BACKEND" }));
@@ -29,6 +35,10 @@ export const releaseService = {
    * Retrieve specific release review by unique ID.
    */
   async getReleaseReviewById(id: string): Promise<ReleaseReviewRecord | null> {
+    if (isDemoMode()) {
+      return demoReleaseService.getReleaseReviewById(id);
+    }
+
     try {
       const response = await apiClient.get<ReleaseReviewRecord>(`/release-reviews/${id}`);
       return { ...response.data, dataSource: "LIVE_BACKEND" };
@@ -43,6 +53,10 @@ export const releaseService = {
    * Enforces backend authorization. Throws if backend is offline.
    */
   async submitReviewDecision(payload: ReviewSubmissionPayload): Promise<{ success: boolean; message: string }> {
+    if (isDemoMode()) {
+      return demoReleaseService.submitReviewDecision(payload);
+    }
+
     try {
       const response = await apiClient.post<{ success: boolean; message: string }>(
         `/release-reviews/${payload.reviewId}/sign-off`,
