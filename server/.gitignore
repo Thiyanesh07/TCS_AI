@@ -1,0 +1,26 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# Environment and Secrets (CRITICAL)
+.env
+.env.*
+*.env
+!.env.example
+
+# Temporary uploads and storage data
+temp_uploads/
+storage_data/
+*.log
+
+# Pytest / Coverage caches
+.pytest_cache/
+.coverage
+htmlcov/
