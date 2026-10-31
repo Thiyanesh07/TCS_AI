@@ -1,22 +1,40 @@
-# Root .gitignore for QualiTrust AI Monorepo
+# Root .gitignore for QualiTrust AI
 
 # Dependencies
 node_modules/
 .npm/
+frontend/node_modules/
+frontend/dist/
 
-# Parent development artifacts & external reference kits
-.agents/
-hackathon-frontend-arsenal/
-sales-ops-dashboard/
-QualiTrustAI/
-package.json
-package-lock.json
+# Virtual Environments & Python
+.venv/
+venv/
+ENV/
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
 
-# Environment files
+# Environment Variables & Secrets
 .env
 .env.local
 *.env
+*.pem
+*.key
 
-# Operating System files
+# Operating System & IDE
 .DS_Store
 Thumbs.db
+.vscode/
+.idea/
+
+# Storage & Backups
+_ai_engine_backup/
+sandbox_staging/
+storage_data/
+*.db
+*.sqlite
+*.zip

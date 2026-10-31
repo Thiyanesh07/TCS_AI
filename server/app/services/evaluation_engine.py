@@ -3,17 +3,32 @@ Evaluation Engine for QualiTrust AI.
 Performs real, deterministic quality engineering and security inspections for AI applications:
 - ZIP archive applications: Static analysis, prompt injection defense, credential scanning, unsafe deserialization.
 - API target applications: SSRF-safe outbound probing, transport security, error leakage resistance.
+- AI Engine LangGraph Workflow: Multi-agent evaluation, claim-level grounding, PyRIT security probing, Gemini scoring.
 Never executes untrusted code on the API server.
 """
 
 import io
+import os
 import re
+import sys
 import time
+import uuid
 import zipfile
-from typing import List, Dict, Any, Tuple
+import logging
+from typing import List, Dict, Any, Tuple, Optional
 import httpx
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# Ensure project root is in sys.path
+ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+if ROOT_DIR not in sys.path:
+    sys.path.insert(0, ROOT_DIR)
 
 from app.core.api_target_validator import validate_api_target_url
+
+logger = logging.getLogger("qualitrust.evaluation_engine")
 
 # Regex patterns for AI provider credential leakage
 CREDENTIAL_PATTERNS = [
@@ -43,6 +58,7 @@ class EvaluationResultData:
         self.test_results: List[Dict[str, Any]] = []
         self.findings: List[Dict[str, Any]] = []
         self.evidence: List[Dict[str, Any]] = []
+        self.regression_tests: List[Dict[str, Any]] = []
         self.quality_score: float = 100.0
         self.release_status: str = "eligible"
         self.total_tests: int = 0
@@ -52,13 +68,91 @@ class EvaluationResultData:
         self.error_tests: int = 0
 
 
-def evaluate_zip_application(zip_bytes: bytes) -> EvaluationResultData:
+def _invoke_ai_engine(input_data: Any, result: EvaluationResultData) -> None:
+    """Invokes the LangGraph AI Engine and incorporates its metrics, tests, findings, and regressions."""
+    try:
+        from ai_engine.engine import run_ai_evaluation
+        ai_output = run_ai_evaluation(input_data)
+        if not ai_output or not ai_output.test_cases:
+            return
+
+        tc_name_by_id = {}
+        for tc in ai_output.test_cases:
+            name = tc.title
+            tc_name_by_id[tc.id] = name
+            result.test_cases.append({
+                "name": name,
+                "category": tc.category.value if hasattr(tc.category, "value") else str(tc.category),
+                "is_automated": True,
+            })
+
+        for tr in ai_output.test_results:
+            tc_name = tc_name_by_id.get(tr.test_case_id, "AI Engine Evaluation Test")
+            verdict = tr.verdict.value if hasattr(tr.verdict, "value") else str(tr.verdict)
+            severity = tr.severity.value if hasattr(tr.severity, "value") else str(tr.severity)
+            result.test_results.append({
+                "name": tc_name,
+                "verdict": verdict,
+                "severity": severity,
+                "execution_duration_ms": int(tr.latency_ms or 0),
+                "output_summary": str(tr.response)[:500],
+            })
+            result.total_tests += 1
+            if verdict == "pass":
+                result.passed_tests += 1
+            elif verdict == "fail":
+                result.failed_tests += 1
+            elif verdict == "uncertain":
+                result.uncertain_tests += 1
+            else:
+                result.error_tests += 1
+
+        for f in ai_output.findings:
+            sev = f.severity.value if hasattr(f.severity, "value") else str(f.severity)
+            result.findings.append({
+                "title": f.title,
+                "description": f.description,
+                "severity": sev,
+                "evidence": {
+                    "type": "ai_evaluation_finding",
+                    "payload": {
+                        "remediation": f.remediation_recommendation,
+                        "root_cause": f.root_cause_hypothesis,
+                    },
+                },
+            })
+
+        for reg in ai_output.regression_recommendations:
+            result.regression_tests.append({
+                "name": reg.title,
+                "status": getattr(reg, "validation_status", "active"),
+            })
+
+        if ai_output.overall_quality_score is not None:
+            score = ai_output.overall_quality_score
+            if 0.0 <= score <= 1.0:
+                score *= 100.0
+            result.quality_score = round(score, 1)
+
+        if ai_output.release_recommendation:
+            rec = ai_output.release_recommendation.value.lower()
+            result.release_status = rec
+
+    except Exception as exc:
+        logger.warning("AI Engine evaluation bypassed or failed: %s", exc)
+
+
+def evaluate_zip_application(
+    zip_bytes: bytes,
+    run_id: Optional[uuid.UUID] = None,
+    application_id: Optional[uuid.UUID] = None,
+    version_id: Optional[uuid.UUID] = None,
+) -> EvaluationResultData:
     """
     Executes real static code analysis and security inspections on an unpacked ZIP archive in-memory.
     Never executes the uploaded Python modules.
     """
     result = EvaluationResultData()
-    start_time = time.time()
 
     # Collect readable source files from archive
     file_contents: Dict[str, str] = {}
@@ -74,7 +168,7 @@ def evaluate_zip_application(zip_bytes: bytes) -> EvaluationResultData:
                         file_contents[name] = raw.decode("utf-8", errors="ignore")
                     except Exception:
                         continue
-    except Exception as exc:
+    except Exception:
         result.release_status = "inconclusive"
         result.total_tests = 1
         result.error_tests = 1
@@ -99,37 +193,36 @@ def evaluate_zip_application(zip_bytes: bytes) -> EvaluationResultData:
                     "evidence": {
                         "type": "code_snippet",
                         "file_path": filename,
-                        "payload": {"matched_pattern": pattern.pattern[:25] + "..."},
+                        "payload": {"matches_count": len(matches), "pattern": pattern.pattern},
                     },
                 })
     t1_duration = int((time.time() - t1_start) * 1000)
 
-    # 2. Test Case: Unsafe Code Execution Audit
-    tc2_name = "Unsafe Code Execution & Deserialization Audit"
+    # 2. Test Case: Dangerous System Primitives
+    tc2_name = "Dynamic Code Execution & Deserialization Audit"
     tc2_category = "security"
     tc2_verdict = "pass"
     tc2_findings = []
 
     t2_start = time.time()
     for filename, text in file_contents.items():
-        if not filename.endswith(".py"):
-            continue
         for pattern, desc in DANGEROUS_CALLS:
-            if pattern.search(text):
+            matches = pattern.findall(text)
+            if matches:
                 tc2_verdict = "fail"
                 tc2_findings.append({
-                    "title": "Unsafe Dynamic Execution Primitive",
+                    "title": "Dangerous Execution Primitive Detected",
                     "description": f"{desc} in '{filename}'.",
                     "severity": "high",
                     "evidence": {
                         "type": "code_snippet",
                         "file_path": filename,
-                        "payload": {"rule": pattern.pattern},
+                        "payload": {"pattern": pattern.pattern},
                     },
                 })
     t2_duration = int((time.time() - t2_start) * 1000)
 
-    # 3. Test Case: Prompt Template & Injection Defense Check
+    # 3. Test Case: Prompt Injection & Template Safety
     tc3_name = "Prompt Template Injection Resistance"
     tc3_category = "safety"
     tc3_verdict = "pass"
@@ -138,16 +231,17 @@ def evaluate_zip_application(zip_bytes: bytes) -> EvaluationResultData:
     t3_start = time.time()
     for filename, text in file_contents.items():
         for pattern, desc in PROMPT_INJECTION_RISKS:
-            if pattern.search(text):
+            matches = pattern.findall(text)
+            if matches:
                 tc3_verdict = "fail"
                 tc3_findings.append({
-                    "title": "Unbounded Prompt Variable Interpolation",
+                    "title": "Vulnerable Prompt Construction",
                     "description": f"{desc} in '{filename}'.",
                     "severity": "medium",
                     "evidence": {
                         "type": "code_snippet",
                         "file_path": filename,
-                        "payload": {"file": filename},
+                        "payload": {"pattern": pattern.pattern},
                     },
                 })
     t3_duration = int((time.time() - t3_start) * 1000)
@@ -162,7 +256,6 @@ def evaluate_zip_application(zip_bytes: bytes) -> EvaluationResultData:
         tc4_verdict = "uncertain"
     t4_duration = int((time.time() - t4_start) * 1000)
 
-    # Assemble test cases and results
     suite = [
         (tc1_name, tc1_category, tc1_verdict, "critical", t1_duration, tc1_findings, "Scanned all package files for exposed AI provider API keys."),
         (tc2_name, tc2_category, tc2_verdict, "high", t2_duration, tc2_findings, "Inspected Python files for eval/exec and dangerous deserializers."),
@@ -174,19 +267,36 @@ def evaluate_zip_application(zip_bytes: bytes) -> EvaluationResultData:
     return result
 
 
-def evaluate_api_application(target_url: str) -> EvaluationResultData:
+def evaluate_api_application(
+    target_url: str,
+    run_id: Optional[uuid.UUID] = None,
+    application_id: Optional[uuid.UUID] = None,
+    version_id: Optional[uuid.UUID] = None,
+) -> EvaluationResultData:
     """
-    Executes safe outbound probes against an external AI API endpoint.
-    Applies strict SSRF checks at the exact point of execution.
+    Performs SSRF-safe outbound probing and transport inspection against an API target,
+    then executes full LangGraph AI Engine evaluation if configured.
     """
     result = EvaluationResultData()
 
-    # Re-validate target URL immediately before outbound request to prevent DNS rebinding
-    is_valid, err_msg = validate_api_target_url(target_url)
-    if not is_valid:
+    # Pre-flight SSRF Validation
+    is_safe, err_msg = validate_api_target_url(target_url)
+    if not is_safe:
         result.release_status = "blocked"
         result.total_tests = 1
         result.failed_tests = 1
+        result.test_cases.append({
+            "name": "SSRF Target Validation Check",
+            "category": "security",
+            "is_automated": True,
+        })
+        result.test_results.append({
+            "name": "SSRF Target Validation Check",
+            "verdict": "fail",
+            "severity": "critical",
+            "execution_duration_ms": 1,
+            "output_summary": f"Target URL rejected by SSRF protection validator: {err_msg}",
+        })
         result.findings.append({
             "title": "Target Endpoint SSRF Validation Failure",
             "description": f"Target URL failed SSRF pre-flight check: {err_msg}",
@@ -254,6 +364,29 @@ def evaluate_api_application(target_url: str) -> EvaluationResultData:
     ]
 
     _process_suite_results(result, suite)
+
+    # 3. If live evaluation context is supplied and Gemini is configured, invoke AI Engine LangGraph
+    if run_id and application_id and version_id and os.environ.get("GEMINI_API_KEY"):
+        try:
+            from shared.schemas.contracts import AIEngineInput, IntegrationType, TestBudget
+            ai_input = AIEngineInput(
+                run_id=run_id,
+                application_id=application_id,
+                version_id=version_id,
+                integration_type=IntegrationType.API,
+                application_config={
+                    "api_target": {
+                        "endpoint_url": target_url,
+                        "method": "POST",
+                        "bot_mode": "good_bot",
+                    }
+                },
+                test_budget=TestBudget(baseline=2, risk_targeted=2, adversarial=1, regression=1),
+            )
+            _invoke_ai_engine(ai_input, result)
+        except Exception as exc:
+            logger.warning("AI Engine execution failed during API evaluation: %s", exc)
+
     return result
 
 
@@ -321,7 +454,7 @@ def _process_suite_results(result: EvaluationResultData, suite: List[Tuple]):
     # Compute deterministic release status
     if errors > 0:
         result.release_status = "inconclusive"
-    elif has_critical or failed > 0 and has_high:
+    elif has_critical or (failed > 0 and has_high):
         result.release_status = "blocked"
     elif result.quality_score >= 80.0 and not has_high:
         result.release_status = "eligible"
@@ -329,4 +462,3 @@ def _process_suite_results(result: EvaluationResultData, suite: List[Tuple]):
         result.release_status = "review_required"
     else:
         result.release_status = "blocked"
-

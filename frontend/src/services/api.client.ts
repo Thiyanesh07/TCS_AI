@@ -6,7 +6,8 @@ import { ENV } from "@/utils/env";
  *
  * All outbound network requests are channeled through this Axios singleton.
  * Request interceptors inject session authorization credentials.
- * Response interceptors normalize backend errors and intercept 401 unauthenticated signals.
+ * Response interceptors normalize backend errors, unwrap standard response envelopes,
+ * and intercept 401 unauthenticated signals.
  */
 export const apiClient: AxiosInstance = axios.create({
   baseURL: ENV.API_BASE_URL,
@@ -20,8 +21,11 @@ export const apiClient: AxiosInstance = axios.create({
 // Request Interceptor: Attach authentication token (when session exists)
 apiClient.interceptors.request.use(
   (config) => {
-    // Note: Bearer token or cookie handling will be confirmed with backend team
-    const token = typeof window !== "undefined" ? localStorage.getItem("qualitrust_token") : null;
+    const token =
+      typeof window !== "undefined"
+        ? localStorage.getItem("qualitrust_access_token") ||
+          localStorage.getItem("qualitrust_token")
+        : null;
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -30,14 +34,28 @@ apiClient.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Response Interceptor: Global Error Normalization
+// Response Interceptor: Global Envelope Normalization & Error Handling
 apiClient.interceptors.response.use(
-  (response: AxiosResponse) => response,
+  (response: AxiosResponse) => {
+    // Automatically unwrap standard backend envelope { data: ..., request_id: ... }
+    if (
+      response.data &&
+      typeof response.data === "object" &&
+      "data" in response.data &&
+      "request_id" in response.data
+    ) {
+      response.data = response.data.data;
+    }
+    return response;
+  },
   (error) => {
+    const backendMessage = error.response?.data?.error?.message;
+    if (backendMessage) {
+      error.message = backendMessage;
+    }
     if (error.response?.status === 401) {
-      // Broadcast unauthenticated event or trigger session refresh
       if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
-        // Safe UX redirection hook placeholder
+        // Safe redirect or session clean
       }
     }
     return Promise.reject(error);

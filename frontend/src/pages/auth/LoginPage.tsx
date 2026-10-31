@@ -1,23 +1,25 @@
 import * as React from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { AuthLayout } from "@/app/layouts/AuthLayout";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Button } from "@/components/ui/button";
-import { AlertCircle, Lock, ArrowRight, Info } from "lucide-react";
+import { AlertCircle, Lock, ArrowRight } from "lucide-react";
+import { authService } from "@/services/auth.service";
 
 export function LoginPage() {
+  const navigate = useNavigate();
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [rememberMe, setRememberMe] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(false);
   const [validationErrors, setValidationErrors] = React.useState<{ email?: string; password?: string }>({});
-  const [contractNotice, setContractNotice] = React.useState<string | null>(null);
+  const [loginError, setLoginError] = React.useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setContractNotice(null);
+    setLoginError(null);
 
     // Client-side input validation
     const errors: { email?: string; password?: string } = {};
@@ -41,14 +43,18 @@ export function LoginPage() {
     setValidationErrors({});
     setIsLoading(true);
 
-    // Note: Backend authentication contract is pending confirmation.
-    // In accordance with architecture guidelines, we do not invent fake tokens or fake endpoints.
-    window.setTimeout(() => {
+    try {
+      await authService.login({ email, password });
+      await authService.getMe();
+      navigate("/dashboard");
+    } catch (err: any) {
       setIsLoading(false);
-      setContractNotice(
-        "Backend Authentication Contract Status: PENDING_CONFIRMATION. Outbound credentials dispatch is safely gated until OpenAPI endpoint specification is confirmed."
+      setLoginError(
+        err.response?.data?.detail ||
+          err.message ||
+          "Authentication failed. Please verify credentials."
       );
-    }, 600);
+    }
   };
 
   return (
@@ -67,27 +73,18 @@ export function LoginPage() {
         </CardHeader>
 
         <CardContent className="space-y-4">
-          {/* Integration Status Notice */}
-          {contractNotice && (
+          {/* Error Message */}
+          {loginError && (
             <div
               role="alert"
-              className="flex items-start gap-2.5 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 animate-in fade-in duration-200"
+              className="flex items-start gap-2.5 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-800 animate-in fade-in duration-200"
             >
-              <Info className="h-4 w-4 shrink-0 mt-0.5 text-amber-600" />
+              <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-red-600" />
               <div className="space-y-1">
-                <span className="font-semibold block">Authentication Contract Gate</span>
-                <span className="text-[11px] leading-relaxed block text-amber-700">
-                  {contractNotice}
+                <span className="font-semibold block">Authentication Error</span>
+                <span className="text-[11px] leading-relaxed block text-red-700">
+                  {loginError}
                 </span>
-                <div className="pt-1">
-                  <Link
-                    to="/dashboard"
-                    className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-700 hover:text-indigo-900 hover:underline"
-                  >
-                    <span>Proceed to Dashboard Preview</span>
-                    <ArrowRight className="h-3 w-3" />
-                  </Link>
-                </div>
               </div>
             </div>
           )}
@@ -191,4 +188,3 @@ export function LoginPage() {
 }
 
 export default LoginPage;
-

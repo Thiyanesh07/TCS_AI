@@ -17,6 +17,7 @@ from app.models.test_case import TestCase
 from app.models.test_result import TestResult
 from app.models.finding import Finding
 from app.models.evidence import Evidence
+from app.models.regression_test import RegressionTest
 from app.models.audit_event import AuditEvent
 from app.services.storage_service import get_storage_service
 from app.services.evaluation_engine import evaluate_zip_application, evaluate_api_application
@@ -132,7 +133,7 @@ def execute_evaluation_job(run_id: uuid.UUID) -> None:
 
             storage = get_storage_service()
             zip_bytes = storage.download_file(version.storage_key)
-            result_data = evaluate_zip_application(zip_bytes)
+            result_data = evaluate_zip_application(zip_bytes, run_id=run.id, application_id=app.id, version_id=version.id)
 
         elif app.integration_type == "api":
             # Retrieve target URL from audit events
@@ -152,7 +153,7 @@ def execute_evaluation_job(run_id: uuid.UUID) -> None:
                 db.commit()
                 return
 
-            result_data = evaluate_api_application(target_url)
+            result_data = evaluate_api_application(target_url, run_id=run.id, application_id=app.id, version_id=version.id)
         else:
             run.status = "failed"
             run.release_status = "inconclusive"
@@ -215,6 +216,28 @@ def execute_evaluation_job(run_id: uuid.UUID) -> None:
                     payload=ev_data.get("payload"),
                 )
                 db.add(evidence)
+
+        # Persist regression recommendations
+        if hasattr(result_data, 'regression_tests'):
+            for reg_dict in result_data.regression_tests:
+                reg_name = reg_dict['name']
+                existing_reg = (
+                    db.query(RegressionTest)
+                    .filter(
+                        RegressionTest.application_id == app.id,
+                        RegressionTest.name == reg_name,
+                    )
+                    .first()
+                )
+                if not existing_reg:
+                    reg = RegressionTest(
+                        application_id=app.id,
+                        name=reg_name,
+                        baseline_run_id=run.id,
+                        target_version_id=version.id,
+                        status=reg_dict.get('status', 'active'),
+                    )
+                    db.add(reg)
 
         # Update run completion state
         run.quality_score = result_data.quality_score
